@@ -1063,30 +1063,31 @@
                 <div class="contact-form-card">
                     <h3 style="font-size: 1.5rem; margin-bottom: 20px;">Send Us an Inquiry</h3>
                     
-                    <div id="formSuccess" class="form-feedback">
+                    <div id="formSuccess" class="form-feedback" role="status" aria-live="polite">
                         Thank you for your message. A representative from GREGTAN will respond promptly.
                     </div>
 
-                    <form id="contactForm" onsubmit="handleFormSubmit(event)">
+                    <form id="contactForm" action="https://formspree.io/f/xwlozonv" method="POST" onsubmit="handleFormSubmit(event)">
+                        <input type="hidden" id="contactTrigger" name="trigger_source" value="Send Us an Inquiry">
                         <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label" for="fullName">Full Name</label>
-                                <input type="text" id="fullName" class="form-control" placeholder="e.g. John Doe" required>
+                                <input type="text" id="fullName" name="name" class="form-control" placeholder="e.g. John Doe" required>
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="email">Email Address</label>
-                                <input type="email" id="email" class="form-control" placeholder="e.g. john@company.com" required>
+                                <input type="email" id="email" name="email" class="form-control" placeholder="e.g. john@company.com" required>
                             </div>
                         </div>
 
                         <div class="form-row">
                             <div class="form-group">
                                 <label class="form-label" for="phone">Phone Number</label>
-                                <input type="tel" id="phone" class="form-control" placeholder="e.g. +263 ...">
+                                <input type="tel" id="phone" name="phone" class="form-control" placeholder="e.g. +263 ...">
                             </div>
                             <div class="form-group">
                                 <label class="form-label" for="division">Division of Interest</label>
-                                <select id="division" class="form-control">
+                                <select id="division" name="division" class="form-control">
                                     <option value="Electrical / Mechanical Engineering">Electrical / Mechanical Engineering</option>
                                     <option value="Commodity Broking">Commodity Broking</option>
                                     <option value="General Inquiry">General Corporate Inquiry</option>
@@ -1096,10 +1097,10 @@
 
                         <div class="form-group">
                             <label class="form-label" for="message">Message / Scope of Work</label>
-                            <textarea id="message" class="form-control" placeholder="Provide details regarding your engineering needs or commodity requirements..." required></textarea>
+                            <textarea id="message" name="message" class="form-control" placeholder="Provide details regarding your engineering needs or commodity requirements..." required></textarea>
                         </div>
 
-                        <button type="submit" class="btn btn-primary" style="width: 100%;">Submit Message</button>
+                        <button type="submit" id="contactSubmitBtn" class="btn btn-primary" style="width: 100%;">Submit Message</button>
                     </form>
                 </div>
             </div>
@@ -1215,14 +1216,144 @@
         });
 
         // Form Submission Feedback
-        function handleFormSubmit(event) {
+        const contactForm = document.getElementById('contactForm');
+        const contactTriggerInput = document.getElementById('contactTrigger');
+        const contactNameInput = document.getElementById('fullName');
+        const contactEmailInput = document.getElementById('email');
+        const contactPhoneInput = document.getElementById('phone');
+        const contactDivisionInput = document.getElementById('division');
+        const contactMessageInput = document.getElementById('message');
+        const contactSubmitBtn = document.getElementById('contactSubmitBtn');
+        const contactFeedback = document.getElementById('formSuccess');
+        const defaultContactSubmitText = contactSubmitBtn.textContent;
+        let isSubmittingContact = false;
+        let contactFeedbackTimer = null;
+
+        function setContactFeedback(type, message, fallbackHref = '') {
+            if (contactFeedbackTimer) {
+                clearTimeout(contactFeedbackTimer);
+                contactFeedbackTimer = null;
+            }
+            contactFeedback.textContent = message;
+            if (type === 'error') {
+                contactFeedback.style.backgroundColor = '#FEE2E2';
+                contactFeedback.style.color = '#991B1B';
+                contactFeedback.style.border = '1px solid #FCA5A5';
+                if (fallbackHref) {
+                    const fallbackLink = document.createElement('a');
+                    fallbackLink.href = fallbackHref;
+                    fallbackLink.textContent = INQUIRY_RECIPIENT_EMAIL;
+                    fallbackLink.style.textDecoration = 'underline';
+                    fallbackLink.style.fontWeight = '600';
+                    contactFeedback.appendChild(fallbackLink);
+                    contactFeedback.appendChild(document.createTextNode('.'));
+                }
+            } else {
+                contactFeedback.style.backgroundColor = '';
+                contactFeedback.style.color = '';
+                contactFeedback.style.border = '';
+                contactFeedbackTimer = setTimeout(() => {
+                    contactFeedback.style.display = 'none';
+                    contactFeedbackTimer = null;
+                }, 5000);
+            }
+            contactFeedback.style.display = 'block';
+        }
+
+        function setContactSubmitting(submitting) {
+            isSubmittingContact = submitting;
+            contactSubmitBtn.disabled = submitting;
+            contactSubmitBtn.textContent = submitting ? 'Sending...' : defaultContactSubmitText;
+            contactSubmitBtn.style.opacity = submitting ? '0.7' : '';
+            contactSubmitBtn.style.cursor = submitting ? 'not-allowed' : '';
+        }
+
+        async function handleFormSubmit(event) {
             event.preventDefault();
-            const feedback = document.getElementById('formSuccess');
-            feedback.style.display = 'block';
-            document.getElementById('contactForm').reset();
-            setTimeout(() => {
-                feedback.style.display = 'none';
-            }, 5000);
+            if (isSubmittingContact) {
+                return;
+            }
+
+            const triggerSource = contactTriggerInput.value.trim() || 'Send Us an Inquiry';
+            const name = contactNameInput.value.trim();
+            const email = contactEmailInput.value.trim();
+            const phone = contactPhoneInput.value.trim();
+            const division = contactDivisionInput.value.trim();
+            const message = contactMessageInput.value.trim();
+
+            if (!name) {
+                contactNameInput.value = '';
+                contactForm.reportValidity();
+                return;
+            }
+            if (!email) {
+                contactEmailInput.value = '';
+                contactForm.reportValidity();
+                return;
+            }
+            if (!message) {
+                contactMessageInput.value = '';
+                contactForm.reportValidity();
+                return;
+            }
+
+            if (contactFeedbackTimer) {
+                clearTimeout(contactFeedbackTimer);
+                contactFeedbackTimer = null;
+            }
+            contactFeedback.style.display = 'none';
+            setContactSubmitting(true);
+
+            const formData = new FormData(contactForm);
+            formData.set('trigger_source', triggerSource);
+            formData.set('name', name);
+            formData.set('email', email);
+            formData.set('phone', phone);
+            formData.set('division', division);
+            formData.set('message', message);
+            formData.set('_subject', `GREGTAN Inquiry (${division}) - ${name}`);
+
+            try {
+                const response = await fetch(INQUIRY_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    body: formData
+                });
+
+                const responseData = await response.json().catch(() => null);
+
+                if (!response.ok || (responseData && (responseData.ok === false || responseData.success === false))) {
+                    const formspreeDetail = parseFormspreeError(responseData);
+                    const error = new Error(formspreeDetail || `Request failed with status ${response.status}`);
+                    error.formspreeDetail = formspreeDetail;
+                    throw error;
+                }
+
+                contactForm.reset();
+                setContactFeedback('success', 'Thank you for your message. A representative from GREGTAN will respond promptly.');
+            } catch (error) {
+                console.error('Contact form submission failed:', error);
+                const fallbackSubject = `GREGTAN Inquiry (${division}) - ${name}`;
+                const fallbackBody = [
+                    `Trigger: ${triggerSource}`,
+                    `Full Name: ${name}`,
+                    `Email Address: ${email}`,
+                    `Phone Number: ${phone || 'Not provided'}`,
+                    `Division of Interest: ${division}`,
+                    '',
+                    'Message / Scope of Work:',
+                    message.replace(/\r?\n/g, '\r\n')
+                ].join('\r\n');
+                const fallbackHref = `mailto:${INQUIRY_RECIPIENT_EMAIL}?subject=${encodeURIComponent(fallbackSubject)}&body=${encodeURIComponent(fallbackBody)}`;
+                const errorPrefix = error && error.formspreeDetail
+                    ? `Unable to send your message (${error.formspreeDetail}). Please try again or email us directly at `
+                    : 'Unable to send your message right now. Please try again or email us directly at ';
+                setContactFeedback('error', errorPrefix, fallbackHref);
+            } finally {
+                setContactSubmitting(false);
+            }
         }
 
         // Modal Logic
