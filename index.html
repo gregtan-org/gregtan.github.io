@@ -1045,7 +1045,7 @@
                         </div>
                         <div class="contact-item-details">
                             <h4>Primary Email Contact</h4>
-                            <a href="mailto:garizawaira@gmail.com">garizawaira@gmail.com</a>
+                            <a href="mailto:gregtaninvestments@gmail.com">gregtaninvestments@gmail.com</a>
                         </div>
                     </div>
 
@@ -1147,7 +1147,7 @@
                         217 Samora Machel<br>
                         Belvedere, Harare, Zimbabwe<br>
                         <strong>Phone:</strong> (0242) 740528<br>
-                        <strong>Email:</strong> garizawaira@gmail.com
+                        <strong>Email:</strong> gregtaninvestments@gmail.com
                     </p>
                 </div>
             </div>
@@ -1166,22 +1166,24 @@
             <h3 style="font-size: 1.5rem; margin-bottom: 8px;">Request a Quote / Consultation</h3>
             <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 24px;">Complete the form below and an engineer or trade representative will reach out.</p>
 
-            <form onsubmit="handleModalSubmit(event)">
+            <div id="modalFeedback" class="form-feedback" role="status" aria-live="polite"></div>
+
+            <form id="quoteForm" action="mailto:gregtaninvestments@gmail.com" method="post" enctype="text/plain" onsubmit="handleModalSubmit(event)">
                 <div class="form-group">
-                    <label class="form-label">Selected Division</label>
-                    <input type="text" id="modalDivision" class="form-control" readonly style="background-color: #F1F5F9;">
+                    <label class="form-label" for="modalDivision">Selected Division</label>
+                    <input type="text" id="modalDivision" name="division" class="form-control" readonly style="background-color: #F1F5F9;">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Your Name</label>
-                    <input type="text" class="form-control" required placeholder="Full Name">
+                    <label class="form-label" for="modalName">Your Name</label>
+                    <input type="text" id="modalName" name="name" class="form-control" required placeholder="Full Name">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Contact Email / Phone</label>
-                    <input type="text" class="form-control" required placeholder="Email or Mobile Number">
+                    <label class="form-label" for="modalContact">Contact Email / Phone</label>
+                    <input type="text" id="modalContact" name="contact" class="form-control" required placeholder="Email or Mobile Number">
                 </div>
                 <div class="form-group">
-                    <label class="form-label">Project / Order Specifications</label>
-                    <textarea class="form-control" placeholder="Describe requirements..." required></textarea>
+                    <label class="form-label" for="modalSpecs">Project / Order Specifications</label>
+                    <textarea id="modalSpecs" name="specifications" class="form-control" placeholder="Describe requirements..." required></textarea>
                 </div>
                 <button type="submit" class="btn btn-primary" style="width: 100%;">Submit Request</button>
             </form>
@@ -1220,22 +1222,93 @@
         }
 
         // Modal Logic
+        const INQUIRY_EMAIL = 'gregtaninvestments@gmail.com';
         const modal = document.getElementById('quoteModal');
+        const quoteForm = document.getElementById('quoteForm');
         const modalDivisionInput = document.getElementById('modalDivision');
+        const modalNameInput = document.getElementById('modalName');
+        const modalContactInput = document.getElementById('modalContact');
+        const modalSpecsInput = document.getElementById('modalSpecs');
+        const modalFeedback = document.getElementById('modalFeedback');
+        let modalCloseTimer = null;
 
         function openModal(divisionName = 'General Engineering & Commodity Inquiry') {
+            if (modalCloseTimer) {
+                clearTimeout(modalCloseTimer);
+                modalCloseTimer = null;
+            }
+            modalFeedback.style.display = 'none';
+            modalFeedback.textContent = '';
             modalDivisionInput.value = divisionName;
             modal.classList.add('active');
         }
 
         function closeModal() {
+            if (modalCloseTimer) {
+                clearTimeout(modalCloseTimer);
+                modalCloseTimer = null;
+            }
+            modalFeedback.style.display = 'none';
+            modalFeedback.textContent = '';
             modal.classList.remove('active');
         }
 
         function handleModalSubmit(event) {
             event.preventDefault();
-            alert('Your request has been recorded. Our team will contact you shortly.');
-            closeModal();
+
+            const division = modalDivisionInput.value.trim() || 'General Engineering & Commodity Inquiry';
+            const name = modalNameInput.value.trim();
+            const contact = modalContactInput.value.trim();
+            const specs = modalSpecsInput.value.trim().replace(/\r?\n/g, '\r\n');
+
+            if (!name) {
+                modalNameInput.value = '';
+                quoteForm.reportValidity();
+                return;
+            }
+            if (!contact) {
+                modalContactInput.value = '';
+                quoteForm.reportValidity();
+                return;
+            }
+            if (!specs) {
+                modalSpecsInput.value = '';
+                quoteForm.reportValidity();
+                return;
+            }
+
+            const subject = `GREGTAN Inquiry (${division}) - ${name}`;
+            const body = [
+                `Selected Division: ${division}`,
+                `Your Name: ${name}`,
+                `Contact Email / Phone: ${contact}`,
+                '',
+                'Project / Order Specifications:',
+                specs
+            ].join('\r\n');
+
+            const mailtoUrl = `mailto:${INQUIRY_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+            window.location.href = mailtoUrl;
+
+            quoteForm.reset();
+            modalDivisionInput.value = division;
+
+            modalFeedback.textContent = `Your request for ${division} has been prepared for ${INQUIRY_EMAIL}. `;
+            const fallbackLink = document.createElement('a');
+            fallbackLink.href = mailtoUrl;
+            fallbackLink.textContent = 'Open email client';
+            fallbackLink.style.textDecoration = 'underline';
+            fallbackLink.style.fontWeight = '600';
+            modalFeedback.appendChild(fallbackLink);
+            modalFeedback.style.display = 'block';
+
+            if (modalCloseTimer) {
+                clearTimeout(modalCloseTimer);
+            }
+            modalCloseTimer = setTimeout(() => {
+                closeModal();
+            }, 5000);
         }
 
         // Close modal when clicking outside
