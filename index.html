@@ -817,7 +817,7 @@
                 <a href="#divisions">Divisions</a>
                 <a href="#about">About Us</a>
                 <a href="#contact">Contact</a>
-                <button class="btn btn-primary nav-cta" onclick="openModal()">Get a Quote</button>
+                <button class="btn btn-primary nav-cta" onclick="openModal('General Engineering & Commodity Inquiry', 'Get a Quote')">Get a Quote</button>
             </nav>
 
             <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle Navigation">
@@ -838,7 +838,7 @@
                 <p class="hero-tagline">Powering Your Success through high-caliber industrial engineering and resilient global commodity supply networks.</p>
                 
                 <div class="hero-buttons">
-                    <button class="btn btn-primary" onclick="openModal()">Contact an Engineer</button>
+                    <button class="btn btn-primary" onclick="openModal('General Engineering & Commodity Inquiry', 'Contact an Engineer')">Contact an Engineer</button>
                     <a href="#divisions" class="btn btn-outline">Explore Divisions</a>
                 </div>
 
@@ -903,7 +903,7 @@
                             </div>
                         </div>
 
-                        <button class="btn btn-primary" onclick="openModal('Electrical & Mechanical Engineering')">Request Technical Consult</button>
+                        <button class="btn btn-primary" onclick="openModal('Electrical & Mechanical Engineering', 'Request Technical Consult')">Request Technical Consult</button>
                     </div>
                 </div>
 
@@ -940,7 +940,7 @@
                             </div>
                         </div>
 
-                        <button class="btn btn-primary" onclick="openModal('Commodity Broking')">Inquire About Trading</button>
+                        <button class="btn btn-primary" onclick="openModal('Commodity Broking', 'Inquire About Trading')">Inquire About Trading</button>
                     </div>
                 </div>
             </div>
@@ -1168,7 +1168,8 @@
 
             <div id="modalFeedback" class="form-feedback" role="status" aria-live="polite"></div>
 
-            <form id="quoteForm" action="mailto:gregtaninvestments@gmail.com" method="post" enctype="text/plain" onsubmit="handleModalSubmit(event)">
+            <form id="quoteForm" method="post" onsubmit="handleModalSubmit(event)">
+                <input type="hidden" id="modalTrigger" name="triggerSource" value="">
                 <div class="form-group">
                     <label class="form-label" for="modalDivision">Selected Division</label>
                     <input type="text" id="modalDivision" name="division" class="form-control" readonly style="background-color: #F1F5F9;">
@@ -1185,13 +1186,17 @@
                     <label class="form-label" for="modalSpecs">Project / Order Specifications</label>
                     <textarea id="modalSpecs" name="specifications" class="form-control" placeholder="Describe requirements..." required></textarea>
                 </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%;">Submit Request</button>
+                <button type="submit" id="modalSubmitBtn" class="btn btn-primary" style="width: 100%;">Submit Request</button>
             </form>
         </div>
     </div>
 
     <!-- JavaScript Logic -->
     <script>
+        // Paste your Formspree, Web3Forms, or webhook endpoint URL configured for gregtaninvestments@gmail.com
+        const INQUIRY_ENDPOINT = "REPLACE_WITH_FORM_ENDPOINT_URL";
+        const INQUIRY_RECIPIENT_EMAIL = "gregtaninvestments@gmail.com";
+
         // Dynamic Copyright Year
         document.getElementById('year').textContent = new Date().getFullYear();
 
@@ -1222,44 +1227,99 @@
         }
 
         // Modal Logic
-        const INQUIRY_EMAIL = 'gregtaninvestments@gmail.com';
         const modal = document.getElementById('quoteModal');
         const quoteForm = document.getElementById('quoteForm');
         const modalDivisionInput = document.getElementById('modalDivision');
+        const modalTriggerInput = document.getElementById('modalTrigger');
         const modalNameInput = document.getElementById('modalName');
         const modalContactInput = document.getElementById('modalContact');
         const modalSpecsInput = document.getElementById('modalSpecs');
+        const modalSubmitBtn = document.getElementById('modalSubmitBtn');
         const modalFeedback = document.getElementById('modalFeedback');
-        let modalCloseTimer = null;
+        const defaultSubmitText = modalSubmitBtn.textContent;
+        let isSubmittingInquiry = false;
+        let activeSubmissionId = 0;
 
-        function openModal(divisionName = 'General Engineering & Commodity Inquiry') {
-            if (modalCloseTimer) {
-                clearTimeout(modalCloseTimer);
-                modalCloseTimer = null;
+        function setModalFeedback(type, message, fallbackHref = '') {
+            modalFeedback.textContent = message;
+            if (type === 'error') {
+                modalFeedback.style.backgroundColor = '#FEE2E2';
+                modalFeedback.style.color = '#991B1B';
+                modalFeedback.style.border = '1px solid #FCA5A5';
+                if (fallbackHref) {
+                    const fallbackLink = document.createElement('a');
+                    fallbackLink.href = fallbackHref;
+                    fallbackLink.textContent = INQUIRY_RECIPIENT_EMAIL;
+                    fallbackLink.style.textDecoration = 'underline';
+                    fallbackLink.style.fontWeight = '600';
+                    modalFeedback.appendChild(fallbackLink);
+                    modalFeedback.appendChild(document.createTextNode('.'));
+                }
+            } else {
+                modalFeedback.style.backgroundColor = '';
+                modalFeedback.style.color = '';
+                modalFeedback.style.border = '';
             }
+            modalFeedback.style.display = 'block';
+        }
+
+        function clearModalFeedback() {
             modalFeedback.style.display = 'none';
             modalFeedback.textContent = '';
+            modalFeedback.style.backgroundColor = '';
+            modalFeedback.style.color = '';
+            modalFeedback.style.border = '';
+        }
+
+        function setModalSubmitting(submitting) {
+            isSubmittingInquiry = submitting;
+            modalSubmitBtn.disabled = submitting;
+            modalSubmitBtn.textContent = submitting ? 'Sending...' : defaultSubmitText;
+            modalSubmitBtn.style.opacity = submitting ? '0.7' : '';
+            modalSubmitBtn.style.cursor = submitting ? 'not-allowed' : '';
+        }
+
+        function buildFallbackMailtoUrl({ division, name, contact, specs, triggerSource }) {
+            const subject = `GREGTAN Inquiry (${division}) - ${name}`;
+            const body = [
+                `Trigger: ${triggerSource}`,
+                `Selected Division: ${division}`,
+                `Your Name: ${name}`,
+                `Contact Email / Phone: ${contact}`,
+                '',
+                'Project / Order Specifications:',
+                specs.replace(/\r?\n/g, '\r\n')
+            ].join('\r\n');
+            return `mailto:${INQUIRY_RECIPIENT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        }
+
+        function openModal(divisionName = 'General Engineering & Commodity Inquiry', triggerSource = 'Direct Inquiry') {
+            activeSubmissionId++;
+            setModalSubmitting(false);
+            clearModalFeedback();
             modalDivisionInput.value = divisionName;
+            modalTriggerInput.value = triggerSource;
             modal.classList.add('active');
         }
 
         function closeModal() {
-            if (modalCloseTimer) {
-                clearTimeout(modalCloseTimer);
-                modalCloseTimer = null;
-            }
-            modalFeedback.style.display = 'none';
-            modalFeedback.textContent = '';
+            activeSubmissionId++;
+            setModalSubmitting(false);
+            clearModalFeedback();
             modal.classList.remove('active');
         }
 
-        function handleModalSubmit(event) {
+        async function handleModalSubmit(event) {
             event.preventDefault();
+            if (isSubmittingInquiry) {
+                return;
+            }
 
             const division = modalDivisionInput.value.trim() || 'General Engineering & Commodity Inquiry';
+            const triggerSource = modalTriggerInput.value.trim() || 'Direct Inquiry';
             const name = modalNameInput.value.trim();
             const contact = modalContactInput.value.trim();
-            const specs = modalSpecsInput.value.trim().replace(/\r?\n/g, '\r\n');
+            const specs = modalSpecsInput.value.trim();
 
             if (!name) {
                 modalNameInput.value = '';
@@ -1277,38 +1337,70 @@
                 return;
             }
 
-            const subject = `GREGTAN Inquiry (${division}) - ${name}`;
-            const body = [
-                `Selected Division: ${division}`,
-                `Your Name: ${name}`,
-                `Contact Email / Phone: ${contact}`,
-                '',
-                'Project / Order Specifications:',
-                specs
-            ].join('\r\n');
+            clearModalFeedback();
+            const submissionId = ++activeSubmissionId;
+            setModalSubmitting(true);
 
-            const mailtoUrl = `mailto:${INQUIRY_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            const payload = {
+                division,
+                triggerSource,
+                name,
+                contact,
+                specifications: specs,
+                recipient: INQUIRY_RECIPIENT_EMAIL,
+                _subject: `GREGTAN Inquiry (${division}) - ${name}`
+            };
 
-            window.location.href = mailtoUrl;
+            try {
+                if (!INQUIRY_ENDPOINT || INQUIRY_ENDPOINT === 'REPLACE_WITH_FORM_ENDPOINT_URL') {
+                    throw new Error('Inquiry endpoint URL has not been configured.');
+                }
 
-            quoteForm.reset();
-            modalDivisionInput.value = division;
+                const response = await fetch(INQUIRY_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
 
-            modalFeedback.textContent = `Your request for ${division} has been prepared for ${INQUIRY_EMAIL}. `;
-            const fallbackLink = document.createElement('a');
-            fallbackLink.href = mailtoUrl;
-            fallbackLink.textContent = 'Open email client';
-            fallbackLink.style.textDecoration = 'underline';
-            fallbackLink.style.fontWeight = '600';
-            modalFeedback.appendChild(fallbackLink);
-            modalFeedback.style.display = 'block';
+                if (!response.ok) {
+                    throw new Error(`Request failed with status ${response.status}`);
+                }
 
-            if (modalCloseTimer) {
-                clearTimeout(modalCloseTimer);
+                const contentType = response.headers.get('content-type') || '';
+                if (contentType.includes('application/json')) {
+                    const data = await response.json().catch(() => null);
+                    if (data && (data.ok === false || data.success === false)) {
+                        throw new Error(data.message || data.error || 'Submission failed.');
+                    }
+                }
+
+                if (submissionId !== activeSubmissionId) {
+                    return;
+                }
+
+                quoteForm.reset();
+                modalDivisionInput.value = division;
+                modalTriggerInput.value = triggerSource;
+                setModalFeedback('success', `Thank you, ${name}. Your inquiry for ${division} has been sent successfully.`);
+            } catch (error) {
+                console.error('Inquiry submission failed:', error);
+                if (submissionId !== activeSubmissionId) {
+                    return;
+                }
+                const fallbackHref = buildFallbackMailtoUrl({ division, name, contact, specs, triggerSource });
+                setModalFeedback(
+                    'error',
+                    'Unable to send your request right now. Please try again or email us directly at ',
+                    fallbackHref
+                );
+            } finally {
+                if (submissionId === activeSubmissionId) {
+                    setModalSubmitting(false);
+                }
             }
-            modalCloseTimer = setTimeout(() => {
-                closeModal();
-            }, 5000);
         }
 
         // Close modal when clicking outside
