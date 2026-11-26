@@ -1168,8 +1168,8 @@
 
             <div id="modalFeedback" class="form-feedback" role="status" aria-live="polite"></div>
 
-            <form id="quoteForm" method="post" onsubmit="handleModalSubmit(event)">
-                <input type="hidden" id="modalTrigger" name="triggerSource" value="">
+            <form id="quoteForm" action="https://formspree.io/f/xwlozonv" method="POST" onsubmit="handleModalSubmit(event)">
+                <input type="hidden" id="modalTrigger" name="trigger_source" value="">
                 <div class="form-group">
                     <label class="form-label" for="modalDivision">Selected Division</label>
                     <input type="text" id="modalDivision" name="division" class="form-control" readonly style="background-color: #F1F5F9;">
@@ -1193,8 +1193,7 @@
 
     <!-- JavaScript Logic -->
     <script>
-        // Paste your Formspree, Web3Forms, or webhook endpoint URL configured for gregtaninvestments@gmail.com
-        const INQUIRY_ENDPOINT = "REPLACE_WITH_FORM_ENDPOINT_URL";
+        const INQUIRY_ENDPOINT = "https://formspree.io/f/xwlozonv";
         const INQUIRY_RECIPIENT_EMAIL = "gregtaninvestments@gmail.com";
 
         // Dynamic Copyright Year
@@ -1293,6 +1292,25 @@
             return `mailto:${INQUIRY_RECIPIENT_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
         }
 
+        function parseFormspreeError(data) {
+            if (!data || typeof data !== 'object') {
+                return '';
+            }
+            if (Array.isArray(data.errors) && data.errors.length > 0) {
+                return data.errors
+                    .map(err => (err && typeof err.message === 'string' ? err.message.trim() : ''))
+                    .filter(Boolean)
+                    .join(', ');
+            }
+            if (typeof data.error === 'string' && data.error.trim()) {
+                return data.error.trim();
+            }
+            if (typeof data.message === 'string' && data.message.trim()) {
+                return data.message.trim();
+            }
+            return '';
+        }
+
         function openModal(divisionName = 'General Engineering & Commodity Inquiry', triggerSource = 'Direct Inquiry') {
             activeSubmissionId++;
             setModalSubmitting(false);
@@ -1341,40 +1359,30 @@
             const submissionId = ++activeSubmissionId;
             setModalSubmitting(true);
 
-            const payload = {
-                division,
-                triggerSource,
-                name,
-                contact,
-                specifications: specs,
-                recipient: INQUIRY_RECIPIENT_EMAIL,
-                _subject: `GREGTAN Inquiry (${division}) - ${name}`
-            };
+            const formData = new FormData(quoteForm);
+            formData.set('division', division);
+            formData.set('trigger_source', triggerSource);
+            formData.set('name', name);
+            formData.set('contact', contact);
+            formData.set('specifications', specs);
+            formData.set('_subject', `GREGTAN Inquiry (${division}) - ${name}`);
 
             try {
-                if (!INQUIRY_ENDPOINT || INQUIRY_ENDPOINT === 'REPLACE_WITH_FORM_ENDPOINT_URL') {
-                    throw new Error('Inquiry endpoint URL has not been configured.');
-                }
-
                 const response = await fetch(INQUIRY_ENDPOINT, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
                         'Accept': 'application/json'
                     },
-                    body: JSON.stringify(payload)
+                    body: formData
                 });
 
-                if (!response.ok) {
-                    throw new Error(`Request failed with status ${response.status}`);
-                }
+                const responseData = await response.json().catch(() => null);
 
-                const contentType = response.headers.get('content-type') || '';
-                if (contentType.includes('application/json')) {
-                    const data = await response.json().catch(() => null);
-                    if (data && (data.ok === false || data.success === false)) {
-                        throw new Error(data.message || data.error || 'Submission failed.');
-                    }
+                if (!response.ok || (responseData && (responseData.ok === false || responseData.success === false))) {
+                    const formspreeDetail = parseFormspreeError(responseData);
+                    const error = new Error(formspreeDetail || `Request failed with status ${response.status}`);
+                    error.formspreeDetail = formspreeDetail;
+                    throw error;
                 }
 
                 if (submissionId !== activeSubmissionId) {
@@ -1391,11 +1399,10 @@
                     return;
                 }
                 const fallbackHref = buildFallbackMailtoUrl({ division, name, contact, specs, triggerSource });
-                setModalFeedback(
-                    'error',
-                    'Unable to send your request right now. Please try again or email us directly at ',
-                    fallbackHref
-                );
+                const errorPrefix = error && error.formspreeDetail
+                    ? `Unable to send your request (${error.formspreeDetail}). Please try again or email us directly at `
+                    : 'Unable to send your request right now. Please try again or email us directly at ';
+                setModalFeedback('error', errorPrefix, fallbackHref);
             } finally {
                 if (submissionId === activeSubmissionId) {
                     setModalSubmitting(false);
